@@ -2,15 +2,17 @@ package main
 
 import (
 	"flag"
+	"fmt"
 
 	"github.com/mateosanchezl/go-vect/services"
 )
 
-func main(){
+func main() {
 	text := flag.String("text", "", "Text to embed")
 
 	flag.Parse()
 
-	services.GetEmbedding(*text)
-}
+	embedding := services.GetEmbedding(*text)
 
+	fmt.Println(embedding)
+}
