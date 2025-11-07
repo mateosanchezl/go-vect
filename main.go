@@ -14,5 +14,7 @@ func main() {
 
 	embedding := services.GetEmbedding(*text)
 
+	services.StoreEmbedding(embedding)
+
 	fmt.Println(embedding)
 }
