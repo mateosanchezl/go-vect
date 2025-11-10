@@ -7,14 +7,14 @@ import (
 	"math"
 	"os"
 
-	"github.com/mateosanchezl/go-vect/types"
+	"github.com/mateosanchezl/go-vect/internal/embedding"
 )
 
 // Appends embedding to data file
-func StoreEmbedding(embedding types.EmbeddingVector) {
-	bs := vectorToByteSlice(embedding)
+func StoreEmbedding(e embedding.EmbeddingVector) {
+	bs := vectorToByteSlice(e)
 
-	file, err := os.OpenFile("storage/data.dta", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile("storage/data.bin", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func StoreEmbedding(embedding types.EmbeddingVector) {
 }
 
 // Turns an embedding vector into a single byte slice
-func vectorToByteSlice(v types.EmbeddingVector) []byte {
+func vectorToByteSlice(v embedding.EmbeddingVector) []byte {
 	out := make([]byte, len(v)*8) // Allocate 8 bytes to each float in vector
 
 	for i := range len(v) {
