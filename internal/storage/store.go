@@ -18,7 +18,7 @@ func StoreEmbedding(e embedding.EmbeddingVector) {
 
 	file, err := os.OpenFile("internal/db/data.bin", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to open data file:", err)
 	}
 	defer file.Close()
 
@@ -26,7 +26,7 @@ func StoreEmbedding(e embedding.EmbeddingVector) {
 
 	fmt.Printf("%v bytes written", wr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to write embedding to data file:", err)
 	}
 }
 
@@ -76,6 +76,10 @@ func GetLastOffset() (offset int, err error) {
 			return 0, nil // File doesn't exist, start at 0
 		}
 		return 0, err // Real error
+	}
+
+	if len(data) == 0 {
+		return 0, nil
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")

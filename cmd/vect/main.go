@@ -15,7 +15,7 @@ import (
 func main() {
 	err := config.LoadConfig()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to load config:", err)
 	}
 
 	text := flag.String("text", "", "Text to embed")
@@ -36,9 +36,9 @@ func main() {
 	}
 	embeddings, err := model.EmbedBatch(chunks)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to embed batch:", err)
 	}
-	fmt.Printf("Embeddings length: %v", len(embeddings))
+	fmt.Printf("Embeddings length: %v\n", len(embeddings))
 
 	for _, em := range embeddings {
 		storage.StoreEmbedding(em)
@@ -48,7 +48,7 @@ func main() {
 	for i, ch := range chunks {
 		ofs, err := storage.GetLastOffset()
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("failed to get last offset:", err)
 		}
 
 		ofs += (len(embeddings[i]) * 8)
@@ -59,9 +59,9 @@ func main() {
 
 		err = storage.StoreEmbeddingMetaData(md)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("failed to store embedding metadata:", err)
 		}
 
-		fmt.Printf("Using offset: %v", ofs)
+		fmt.Printf("Using offset: %v\n", ofs)
 	}
 }
