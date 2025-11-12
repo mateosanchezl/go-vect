@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strings"
 
 	"github.com/mateosanchezl/go-vect/internal/embedding"
 )
@@ -15,7 +16,7 @@ import (
 func StoreEmbedding(e embedding.EmbeddingVector) {
 	bs := vectorToByteSlice(e)
 
-	file, err := os.OpenFile("storage/data.bin", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile("internal/db/data.bin", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -48,7 +49,7 @@ type EmbeddingMetaData struct {
 }
 
 func StoreEmbeddingMetaData(md EmbeddingMetaData) (err error) {
-	file, err := os.OpenFile("storage/metadata.jsonl", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile("internal/db/metadata.jsonl", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -65,4 +66,31 @@ func StoreEmbeddingMetaData(md EmbeddingMetaData) (err error) {
 	}
 
 	return nil
+}
+
+// Gets the last offset recorded in metadata if available
+func GetLastOffset() (offset int, err error) {
+	data, err := os.ReadFile("internal/db/metadata.jsonl")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil // File doesn't exist, start at 0
+		}
+		return 0, err // Real error
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) == 0 {
+		return 0, nil
+	}
+
+	last := lines[len(lines)-1]
+
+	var lastMd EmbeddingMetaData
+
+	err = json.Unmarshal([]byte(last), &lastMd)
+	if err != nil {
+		return 0, err
+	}
+
+	return lastMd.Offset, nil
 }

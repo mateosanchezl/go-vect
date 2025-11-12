@@ -40,14 +40,28 @@ func main() {
 	}
 	fmt.Printf("Embeddings length: %v", len(embeddings))
 
-	ofs := len(embeddings[0]) * 8
-	fmt.Printf("Using offset: %v", ofs)
+	for _, em := range embeddings {
+		storage.StoreEmbedding(em)
+		fmt.Println("Successfully stored embedding")
+	}
 
-	for _, ch := range chunks {
+	for i, ch := range chunks {
+		ofs, err := storage.GetLastOffset()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		ofs += (len(embeddings[i]) * 8)
 		md := storage.EmbeddingMetaData{
 			Offset: ofs,
 			Text:   ch,
 		}
-		storage.StoreEmbeddingMetaData(md)
+
+		err = storage.StoreEmbeddingMetaData(md)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Using offset: %v", ofs)
 	}
 }
