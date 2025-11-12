@@ -1,6 +1,7 @@
 package search
 
 import (
+	"errors"
 	"math"
 
 	"github.com/mateosanchezl/go-vect/internal/embedding"
@@ -8,7 +9,7 @@ import (
 
 func dot(u embedding.EmbeddingVector, v embedding.EmbeddingVector) (uv float64, err error) {
 	if len(u) != len(v) {
-		return 0.0, err
+		return 0.0, errors.New("dot: vectors are not of same size")
 	}
 
 	t := 0.0
