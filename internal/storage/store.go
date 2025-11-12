@@ -1,7 +1,8 @@
-package services
+package storage
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -14,7 +15,7 @@ import (
 func StoreEmbedding(e embedding.EmbeddingVector) {
 	bs := vectorToByteSlice(e)
 
-	file, err := os.OpenFile("storage/data.bin", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile("storage/data.bin", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,4 +39,30 @@ func vectorToByteSlice(v embedding.EmbeddingVector) []byte {
 	}
 
 	return out
+}
+
+// Store metadata
+type EmbeddingMetaData struct {
+	Offset int
+	Text   string
+}
+
+func StoreEmbeddingMetaData(md EmbeddingMetaData) (err error) {
+	file, err := os.OpenFile("storage/metadata.jsonl", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	mdJson, err := json.Marshal(md)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.WriteString(string(mdJson) + "\n")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

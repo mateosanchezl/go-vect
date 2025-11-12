@@ -3,6 +3,7 @@ package embedding
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 )
@@ -82,6 +83,10 @@ func (hf *HfEmbeddingModel) EmbedBatch(chunks []string) (embeddings []EmbeddingV
 			return nil, err
 		}
 		validatedVects = append(validatedVects, validated)
+	}
+
+	if len(validatedVects) == 0 {
+		return nil, errors.New("no embedding vectors were parsed")
 	}
 
 	return validatedVects, nil
