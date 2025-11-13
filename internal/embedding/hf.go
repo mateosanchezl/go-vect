@@ -45,9 +45,9 @@ func (hf *HfEmbeddingModel) sendEmbeddingRequest(payload HfEmbeddingRequest) (bo
 	return body, nil
 }
 
-func (hf *HfEmbeddingModel) Embed(chunk []string) (embedding EmbeddingVector, err error) {
+func (hf *HfEmbeddingModel) Embed(chunk string) (embedding EmbeddingVector, err error) {
 	payload := HfEmbeddingRequest{
-		Inputs: chunk,
+		Inputs: []string{chunk},
 	}
 
 	body, err := hf.sendEmbeddingRequest(payload)
@@ -55,10 +55,10 @@ func (hf *HfEmbeddingModel) Embed(chunk []string) (embedding EmbeddingVector, er
 		return nil, err
 	}
 
-	var vect []float64
-	json.Unmarshal(body, &vect)
+	var vects [][]float64
+	json.Unmarshal(body, &vects)
 
-	validated, err := NewVector(vect)
+	validated, err := NewVector(vects[0])
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +71,9 @@ func (hf *HfEmbeddingModel) EmbedBatch(chunks []string) (embeddings []EmbeddingV
 		Inputs: chunks,
 	}
 	body, err := hf.sendEmbeddingRequest(payload)
+	if err != nil {
+		return nil, err
+	}
 
 	var vects [][]float64
 	json.Unmarshal(body, &vects)
