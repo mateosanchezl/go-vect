@@ -2,16 +2,25 @@ package search
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
+	"strings"
 
 	"github.com/mateosanchezl/go-vect/internal/embedding"
+	"github.com/mateosanchezl/go-vect/internal/storage"
 )
+
+type SimilaritySearchResult struct {
+	text       string
+	similarity float64
+}
 
 type similarityResult struct {
 	similarity float64
 	pos        int
+	vect       embedding.EmbeddingVector
 }
 
 func GetSimilar(query string, model embedding.EmbeddingModel) (results []string, err error) {
@@ -27,10 +36,10 @@ func GetSimilar(query string, model embedding.EmbeddingModel) (results []string,
 	scores := make([]similarityResult, 0)
 
 	worst := similarityResult{
-		1.0, 1,
+		1.0, 1, embedding.EmbeddingVector{},
 	}
 	best := similarityResult{
-		0.0, 0,
+		0.0, 0, embedding.EmbeddingVector{},
 	}
 
 	for i, cv := range evs {
@@ -45,16 +54,53 @@ func GetSimilar(query string, model embedding.EmbeddingModel) (results []string,
 		if sim > best.similarity {
 			best.similarity = sim
 			best.pos = i
+			best.vect = cv
 		}
 		if sim < worst.similarity {
 			worst.similarity = sim
 			worst.pos = i
+			worst.vect = cv
 		}
 		scores = append(scores, rs)
 	}
 
-	fmt.Printf("Highest score found: %v\n at vector position %v\n", best.similarity, best.pos)
-	fmt.Printf("Lowest score found: %v\n at vector position %v\n", worst.similarity, worst.pos)
+	md, err := os.ReadFile("internal/db/metadata.jsonl")
+	if err != nil {
+		if os.IsNotExist(err) {
+			_, err = os.Create("internal/db/metadata.jsonl")
+			if err != nil {
+				return nil, err
+			}
+			fmt.Println("could not find metadata file, created successfuly.")
+			return []string{}, nil
+		}
+	}
+
+	if len(md) == 0 {
+		return []string{}, nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(md)), "\n")
+	if len(lines) == 0 {
+		return []string{}, nil
+	}
+
+	var bestMd, worstMd storage.EmbeddingMetaData
+
+	json.Unmarshal([]byte(lines[best.pos]), &bestMd)
+	json.Unmarshal([]byte(lines[worst.pos]), &worstMd)
+
+	bestRes := SimilaritySearchResult{
+		similarity: best.similarity,
+		text:       bestMd.Text,
+	}
+
+	worstRes := SimilaritySearchResult{
+		similarity: worst.similarity,
+		text:       worstMd.Text,
+	}
+
+	fmt.Printf("\nBest result found: \n%v \nWorst result found: %v", bestRes, worstRes)
 	return
 }
 

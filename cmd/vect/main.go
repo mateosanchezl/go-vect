@@ -57,7 +57,6 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			break
 
 		} else {
 			chunks := chunker.Chunk(str)
