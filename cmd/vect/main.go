@@ -13,6 +13,7 @@ import (
 	"github.com/mateosanchezl/go-vect/internal/embedding"
 	"github.com/mateosanchezl/go-vect/internal/search"
 	"github.com/mateosanchezl/go-vect/internal/storage"
+	"github.com/mateosanchezl/go-vect/internal/tokenizer"
 )
 
 func main() {
@@ -41,15 +42,6 @@ func main() {
 
 		str := strings.TrimSpace(string(text))
 
-		if str == "e" {
-			fmt.Println("Text to encode: ")
-			et, err := rd.ReadString('\n')
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			embedding.Encode(et, false)
-		}
 		if str == "q" {
 			fmt.Println("Bye!")
 			os.Exit(0)
@@ -69,6 +61,8 @@ func main() {
 			}
 
 		} else {
+			ids, tokens := tokenizer.Encode(str)
+			fmt.Printf("Ids: %v, tokens: %v", ids, tokens)
 			chunks := chunker.Chunk(str)
 			start := time.Now()
 			embeddings, err := model.EmbedBatch(chunks)
