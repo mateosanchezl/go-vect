@@ -12,6 +12,7 @@
 *.test
 *.out
 go.work
+vect
 
 # IDE
 .vscode/
@@ -26,3 +27,12 @@ Thumbs.db
 
 # Data
 internal/db/*
+
+# Models - downloaded embedding models (large files)
+# Keep directory structure but ignore all files
+models/**/*
+!models/.gitkeep
+!models/**/.gitkeep
+
+# Libraries
+libs/tokenizers/

@@ -40,6 +40,16 @@ func main() {
 		}
 
 		str := strings.TrimSpace(string(text))
+
+		if str == "e" {
+			fmt.Println("Text to encode: ")
+			et, err := rd.ReadString('\n')
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			embedding.Encode(et, false)
+		}
 		if str == "q" {
 			fmt.Println("Bye!")
 			os.Exit(0)
