@@ -55,8 +55,11 @@ ensure_correct_commit() {
   
   if [ "$CURRENT_COMMIT" != "$TOKENIZERS_COMMIT" ]; then
     log "Checking out commit ${TOKENIZERS_COMMIT}..."
-    # Fetch to ensure we have the commit
-    git fetch origin "$TOKENIZERS_COMMIT" 2>/dev/null || git fetch origin
+    # Fetch all refs from origin to ensure we have the commit
+    log "Fetching latest changes from origin..."
+    if ! git fetch origin; then
+      fail "Failed to fetch from origin"
+    fi
     
     if ! git checkout "$TOKENIZERS_COMMIT" 2>/dev/null; then
       fail "Failed to checkout commit ${TOKENIZERS_COMMIT}. It may not exist in the repository."
