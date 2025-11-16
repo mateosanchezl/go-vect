@@ -1,20 +1,15 @@
 package embedding
 
 import (
-	"errors"
 	"fmt"
 )
 
 // Vector definition
-type EmbeddingVector []float64
+type EmbeddingVector []float32
 
-func NewVector(val []float64) (EmbeddingVector, error) {
-	if len(val) == 0 {
-		return nil, errors.New("embedding vector cannot be empty")
-	}
-	if len(val) != 768 {
-		msg := fmt.Sprintf("embedding vector must be of length 768, got %v", len(val))
-		return nil, errors.New(msg)
+func NewVector(val []float32, expectedLength int) (EmbeddingVector, error) {
+	if len(val) == 0 || len(val) != expectedLength {
+		return nil, fmt.Errorf("embedding vector must be of length %d", expectedLength)
 	}
 
 	return EmbeddingVector(val), nil

@@ -6,14 +6,11 @@ import (
 	"log"
 	"os"
 	"strings"
-	"time"
 
-	"github.com/mateosanchezl/go-vect/internal/chunking"
 	"github.com/mateosanchezl/go-vect/internal/config"
 	"github.com/mateosanchezl/go-vect/internal/embedding"
 	"github.com/mateosanchezl/go-vect/internal/search"
 	"github.com/mateosanchezl/go-vect/internal/storage"
-	"github.com/mateosanchezl/go-vect/internal/tokenizer"
 )
 
 func main() {
@@ -22,17 +19,15 @@ func main() {
 		log.Fatal("failed to load config:", err)
 	}
 
-	chunker := chunking.FixedChunker{
-		ChunkSize: 512,
-	}
+	// model := embedding.HfEmbeddingModel{
+	// 	Token:    os.Getenv("HUGGING_FACE_INFERENCE_API_TOKEN"),
+	// 	ModelUrl: "https://router.huggingface.co/hf-inference/models/BAAI/bge-base-en-v1.5/pipeline/feature-extraction",
+	// }
 
-	model := embedding.HfEmbeddingModel{
-		Token:    os.Getenv("HUGGING_FACE_INFERENCE_API_TOKEN"),
-		ModelUrl: "https://router.huggingface.co/hf-inference/models/BAAI/bge-base-en-v1.5/pipeline/feature-extraction",
-	}
+	model := embedding.MiniLM{}
 
 	for {
-		fmt.Println("Input text to embed and store, q to quit, s to search: ")
+		fmt.Print("\nInput text to embed and store, q to quit, s to search: ")
 		rd := bufio.NewReader(os.Stdin)
 
 		text, err := rd.ReadString('\n')
@@ -48,7 +43,7 @@ func main() {
 		}
 
 		if str == "s" {
-			fmt.Println("Input query text: ")
+			fmt.Print("Input query text: ")
 			qs, err := rd.ReadString('\n')
 			if err != nil {
 				log.Fatal("failed to read query")
@@ -61,41 +56,47 @@ func main() {
 			}
 
 		} else {
-			ids, tokens := tokenizer.Encode(str)
-			fmt.Printf("Ids: %v, tokens: %v", ids, tokens)
-			chunks := chunker.Chunk(str)
-			start := time.Now()
-			embeddings, err := model.EmbedBatch(chunks)
+			emb, err := model.Embed(str)
 			if err != nil {
-				log.Fatal("failed to embed batch:", err)
-			}
-			elapsed := time.Since(start)
-			fmt.Printf("Embed time: %v ms\n", elapsed.Milliseconds())
-
-			for _, em := range embeddings {
-				storage.StoreEmbedding(em)
-				fmt.Println("Successfully stored embedding")
+				log.Fatal("failed to embed:", err)
 			}
 
-			for i, ch := range chunks {
-				ofs, err := storage.GetLastOffset()
-				if err != nil {
-					log.Fatal("failed to get last offset:", err)
-				}
-
-				ofs += (len(embeddings[i]) * 8)
-				md := storage.EmbeddingMetaData{
-					Offset: ofs,
-					Text:   ch,
-				}
-
-				err = storage.StoreEmbeddingMetaData(md)
-				if err != nil {
-					log.Fatal("failed to store embedding metadata:", err)
-				}
-
-				fmt.Printf("Using offset: %v\n", ofs)
+			storage.StoreEmbedding(emb)
+			err = storage.StoreEmbeddingMetaData(storage.EmbeddingMetaData{
+				Offset: len(emb),
+				Text:   str,
+			})
+			if err != nil {
+				log.Fatal("failed to store embedding metadata:", err)
 			}
+
+			fmt.Println("✓ Embedding stored successfully")
+
+			// 	for _, em := range embeddings {
+			// 		storage.StoreEmbedding(em)
+			// 		fmt.Println("Successfully stored embedding")
+			// 	}
+
+			// 	for i, ch := range chunks {
+			// 		ofs, err := storage.GetLastOffset()
+			// 		if err != nil {
+			// 			log.Fatal("failed to get last offset:", err)
+			// 		}
+
+			// 		ofs += (len(embeddings[i]) * 8)
+			// 		md := storage.EmbeddingMetaData{
+			// 			Offset: ofs,
+			// 			Text:   ch,
+			// 		}
+
+			// 		err = storage.StoreEmbeddingMetaData(md)
+			// 		if err != nil {
+			// 			log.Fatal("failed to store embedding metadata:", err)
+			// 		}
+
+			// 		fmt.Printf("Using offset: %v\n", ofs)
+			// 	}
+			// }
 		}
 	}
 }

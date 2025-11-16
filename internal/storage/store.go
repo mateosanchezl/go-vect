@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"log"
 	"math"
 	"os"
@@ -22,9 +21,7 @@ func StoreEmbedding(e embedding.EmbeddingVector) {
 	}
 	defer file.Close()
 
-	wr, err := file.Write(bs)
-
-	fmt.Printf("%v bytes written", wr)
+	_, err = file.Write(bs)
 	if err != nil {
 		log.Fatal("failed to write embedding to data file:", err)
 	}
@@ -32,11 +29,11 @@ func StoreEmbedding(e embedding.EmbeddingVector) {
 
 // Turns an embedding vector into a single byte slice
 func vectorToByteSlice(v embedding.EmbeddingVector) []byte {
-	out := make([]byte, len(v)*8) // Allocate 8 bytes to each float in vector
+	out := make([]byte, len(v)*4) // Allocate 4 bytes to each float in vector
 
 	for i := range len(v) {
-		bits := math.Float64bits(v[i])                        // Turn the float to bits
-		binary.LittleEndian.PutUint64(out[i*8:(i+1)*8], bits) // Put it in the byte slice
+		bits := math.Float32bits(v[i])                        // Turn the float to bits
+		binary.LittleEndian.PutUint32(out[i*4:(i+1)*4], bits) // Put it in the byte slice
 	}
 
 	return out

@@ -14,11 +14,15 @@ import (
 
 type SimilaritySearchResult struct {
 	text       string
-	similarity float64
+	similarity float32
+}
+
+func (r SimilaritySearchResult) String() string {
+	return fmt.Sprintf("Text: %s\nSimilarity Score: %.4f", r.text, r.similarity)
 }
 
 type similarityResult struct {
-	similarity float64
+	similarity float32
 	pos        int
 	vect       embedding.EmbeddingVector
 }
@@ -36,10 +40,10 @@ func GetSimilar(query string, model embedding.EmbeddingModel) (results []string,
 	scores := make([]similarityResult, 0)
 
 	worst := similarityResult{
-		1.0, 1, embedding.EmbeddingVector{},
+		1, 1, embedding.EmbeddingVector{},
 	}
 	best := similarityResult{
-		0.0, 0, embedding.EmbeddingVector{},
+		0, 0, embedding.EmbeddingVector{},
 	}
 
 	for i, cv := range evs {
@@ -100,7 +104,14 @@ func GetSimilar(query string, model embedding.EmbeddingModel) (results []string,
 		text:       worstMd.Text,
 	}
 
-	fmt.Printf("\nBest result found: \n%v \nWorst result found: %v", bestRes, worstRes)
+	fmt.Println("\n" + strings.Repeat("=", 80))
+	fmt.Println("SEARCH RESULTS")
+	fmt.Println(strings.Repeat("=", 80))
+	fmt.Println("\n🏆 Best Match:")
+	fmt.Printf("   %s\n", strings.ReplaceAll(bestRes.String(), "\n", "\n   "))
+	fmt.Println("\n📉 Worst Match:")
+	fmt.Printf("   %s\n", strings.ReplaceAll(worstRes.String(), "\n", "\n   "))
+	fmt.Println(strings.Repeat("=", 80) + "\n")
 	return
 }
 
@@ -112,20 +123,20 @@ func getVectors() (evs []embedding.EmbeddingVector, err error) {
 		return evs, err
 	}
 
-	bytes_per_vect := 768 * 8
+	bytes_per_vect := 384 * 4
 
 	n_vects := len(data) / bytes_per_vect
 	ofs := 0
 
 	for range n_vects {
-		vect := []float64{}
-		for i := 0; i < bytes_per_vect; i += 8 {
-			fl_bytes := data[ofs+i : ofs+i+8]
-			bits := binary.LittleEndian.Uint64(fl_bytes)
-			vf := math.Float64frombits(bits)
+		vect := []float32{}
+		for i := 0; i < bytes_per_vect; i += 4 {
+			fl_bytes := data[ofs+i : ofs+i+4]
+			bits := binary.LittleEndian.Uint32(fl_bytes)
+			vf := math.Float32frombits(bits)
 			vect = append(vect, vf)
 		}
-		v, err := embedding.NewVector(vect)
+		v, err := embedding.NewVector(vect, 384)
 		if err != nil {
 			return evs, err
 		}
