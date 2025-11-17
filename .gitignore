@@ -36,3 +36,5 @@ models/**/*
 
 # Libraries
 libs/tokenizers/
+
+todo.md

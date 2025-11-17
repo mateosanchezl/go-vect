@@ -2,33 +2,15 @@ package embedding
 
 import (
 	"log"
-	"sync"
 	"time"
 
 	"github.com/mateosanchezl/go-vect/internal/tokenizer"
 	ort "github.com/yalue/onnxruntime_go"
 )
 
-var (
-	ortInitialized bool
-	ortInitMutex   sync.Mutex
-)
-
 type MiniLM struct{}
 
 func (m *MiniLM) Embed(chunk string) (embedding EmbeddingVector, err error) {
-	ort.SetSharedLibraryPath("/opt/homebrew/lib/libonnxruntime.dylib") // TODO: make this configurable
-	ortInitMutex.Lock()
-	if !ortInitialized {
-		err = ort.InitializeEnvironment()
-		if err != nil {
-			ortInitMutex.Unlock()
-			log.Fatal("failed loading onnx runtime: ", err)
-		}
-		ortInitialized = true
-	}
-	ortInitMutex.Unlock()
-
 	tokens, attentionMask, tIds := tokenizer.Encode(chunk, true)
 
 	// Create input id tensor
