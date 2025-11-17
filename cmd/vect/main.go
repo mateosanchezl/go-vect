@@ -27,7 +27,7 @@ func main() {
 	model := embedding.MiniLM{}
 
 	for {
-		fmt.Print("\nInput text to embed and store, q to quit, s to search: ")
+		fmt.Print("\nInput text to embed and store, s to search, d to delete data, q to quit : ")
 		rd := bufio.NewReader(os.Stdin)
 
 		text, err := rd.ReadString('\n')
@@ -40,6 +40,12 @@ func main() {
 		if str == "q" {
 			fmt.Println("Bye!")
 			os.Exit(0)
+		}
+
+		if str == "d" {
+			storage.ClearData()
+			fmt.Println("successfully deleted data")
+			continue
 		}
 
 		if str == "s" {
@@ -61,15 +67,10 @@ func main() {
 				log.Fatal("failed to embed:", err)
 			}
 
-			storage.StoreEmbedding(emb)
-			err = storage.StoreEmbeddingMetaData(storage.EmbeddingMetaData{
-				Offset: len(emb),
-				Text:   str,
-			})
+			storage.StoreEmbedding(emb, str)
 			if err != nil {
 				log.Fatal("failed to store embedding metadata:", err)
 			}
-
 			fmt.Println("✓ Embedding stored successfully")
 
 			// 	for _, em := range embeddings {
