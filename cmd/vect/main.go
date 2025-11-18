@@ -44,13 +44,9 @@ func main() {
 		str := strings.TrimSpace(string(text))
 		if str == "f" {
 			fmt.Print("Input file path: ")
-			if err != nil {
-				log.Fatal("failed to read file path")
-			}
-
 			filePath, err := rd.ReadString('\n')
 			if err != nil {
-				log.Fatal("failed to read file path")
+				log.Fatal("failed to read file path:", err)
 			}
 
 			filePath = strings.TrimSpace(filePath)
@@ -78,7 +74,10 @@ func main() {
 		}
 
 		if str == "d" {
-			storage.ClearData()
+			err := storage.ClearData()
+			if err != nil {
+				log.Fatal("failed to clear data:", err)
+			}
 			fmt.Println("successfully deleted data")
 			continue
 		}
@@ -87,13 +86,13 @@ func main() {
 			fmt.Print("Input query text: ")
 			qs, err := rd.ReadString('\n')
 			if err != nil {
-				log.Fatal("failed to read query")
+				log.Fatal("failed to read query:", err)
 			}
 
 			qs = strings.TrimSpace(string(qs))
 			_, err = search.GetSimilar(qs, &model)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatal("failed to get similar:", err)
 			}
 
 		} else {

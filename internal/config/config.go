@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -22,7 +23,10 @@ var (
 )
 
 func LoadConfig() (err error) {
-	initEnv()
+	err = initEnv()
+	if err != nil {
+		return fmt.Errorf("failed to initialize environment: %w", err)
+	}
 
 	if _, err := os.Stat(".env"); os.IsNotExist(err) {
 		log.Println("warning: .env file not found. make sure to set this up to use huggingface embedding models via api")
@@ -31,17 +35,27 @@ func LoadConfig() (err error) {
 
 	err = godotenv.Load()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed loading env: %w", err)
 	}
 	return nil
 }
 
-func initEnv() {
-	initTokenizer()
-	initOnnxRuntime()
+func initEnv() error {
+	err := initTokenizer()
+	if err != nil {
+		return fmt.Errorf("failed to initialize tokenizer: %w", err)
+	}
+
+	err = initOnnxRuntime()
+	if err != nil {
+		return fmt.Errorf("failed to initialize ONNX runtime: %w", err)
+	}
+
+	return nil
 }
 
-func initTokenizer() {
+func initTokenizer() error {
+	var initErr error
 	tkInitOnce.Do(func() {
 		tokenizerPath := os.Getenv("TOKENIZER_JSON")
 		if tokenizerPath == "" {
@@ -57,7 +71,8 @@ func initTokenizer() {
 
 		tk, err := pretrained.FromFile(tokenizerPath)
 		if err != nil {
-			log.Fatal("error in initialising tokeniser: ", err)
+			initErr = fmt.Errorf("failed to initialize tokenizer: %w", err)
+			return
 		}
 
 		// Values from the MiniLM tokeniser config
@@ -73,31 +88,43 @@ func initTokenizer() {
 		Tokenizer = tk
 		fmt.Println("tokenizer initialised")
 	})
+	return initErr
 }
 
-func initOnnxRuntime() {
-	initOnnxLibPath() // Ensure we have a path in env
+func initOnnxRuntime() error {
+	err := initOnnxLibPath() // Ensure we have a path in env
+	if err != nil {
+		return fmt.Errorf("failed to initialize ONNX library path: %w", err)
+	}
+
 	path := os.Getenv("ONNX_RUNTIME_LIB_PATH")
 	ort.SetSharedLibraryPath(path)
 
+	var initErr error
 	ortInitOnce.Do(func() { // Initialise once
 		err := ort.InitializeEnvironment()
 		if err != nil {
-			log.Fatalln("failed loading onnx runtime: ", err)
+			initErr = fmt.Errorf("failed to initialize ONNX runtime: %w", err)
+			return
 		}
 		fmt.Println("onnx runtime initialised")
 	})
+	return initErr
 }
 
-func initOnnxLibPath() {
+func initOnnxLibPath() error {
 	onnxEnvPath := os.Getenv("ONNX_RUNTIME_LIB_PATH")
 	if onnxEnvPath == "" {
 		onnxPath := getDefaultOnnxLibPath()
 		if onnxPath == "" {
-			log.Fatalln("error: no onnx runtime path was found in env or where it is commonly located on your system type. please set this up in your .env")
+			return errors.New("no onnx runtime path was found in env or where it is commonly located on your system type. please set this up in your .env")
 		}
-		os.Setenv("ONNX_RUNTIME_LIB_PATH", onnxPath)
+		err := os.Setenv("ONNX_RUNTIME_LIB_PATH", onnxPath)
+		if err != nil {
+			return fmt.Errorf("failed to set onnx path environment variable: %w", err)
+		}
 	}
+	return nil
 }
 
 func getDefaultOnnxLibPath() string {

@@ -1,7 +1,7 @@
 package tokenizer
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/mateosanchezl/go-vect/internal/config"
 	"github.com/sugarme/tokenizer"
@@ -30,11 +30,14 @@ type Encoding struct {
 }
 
 type EncodedBatch struct {
-	TokenIds       []int64
-	AttentionMask  []int64
-	TypeIds        []int64
-	BatchSize      int64
-	SequenceLength int64
+	TokenIds                [][]int64
+	AttentionMasks          [][]int64
+	TypeIds                 [][]int64
+	FlattenedTokenIds       []int64
+	FlattenedAttentionMasks []int64
+	FlattenedTypeIds        []int64
+	BatchSize               int64
+	SequenceLength          int64
 }
 
 func getTokenizer() *tokenizer.Tokenizer {
@@ -44,7 +47,7 @@ func getTokenizer() *tokenizer.Tokenizer {
 	return config.Tokenizer
 }
 
-func EncodeBatch(texts []string, withSpecialTokens bool) (encodedBatch EncodedBatch) {
+func EncodeBatch(texts []string, withSpecialTokens bool) (encodedBatch EncodedBatch, err error) {
 	tk := getTokenizer()
 
 	inputs := make([]tokenizer.EncodeInput, len(texts))
@@ -56,44 +59,53 @@ func EncodeBatch(texts []string, withSpecialTokens bool) (encodedBatch EncodedBa
 
 	encs, err := tk.EncodeBatch(inputs, withSpecialTokens)
 	if err != nil {
-		log.Fatal(err)
+		return EncodedBatch{}, fmt.Errorf("failed to encode batch: %w", err)
 	}
 
 	n := len(encs)
 	if n == 0 {
-		log.Fatal("no encodings returned from tokenizer.EncodeBatch")
+		return EncodedBatch{}, fmt.Errorf("no encodings returned from tokenizer.EncodeBatch")
 	}
 
 	sl := len(encs[0].GetIds())
 
+	tokenIds := make([][]int64, n)
+	attentionMasks := make([][]int64, n)
+	typeIds := make([][]int64, n)
 	// Flatten encodings into single slice
-	tokenIds := make([]int64, n*sl)
-	attentionMask := make([]int64, n*sl)
-	typeIds := make([]int64, n*sl)
+	flattenedTokenIds := make([]int64, n*sl)
+	flattenedAttentionMask := make([]int64, n*sl)
+	flattenedTypeIds := make([]int64, n*sl)
 
 	for i, enc := range encs {
 		startIdx := i * sl
+		tokenIds[i] = intArrtoInt64Arr(enc.Ids)
+		attentionMasks[i] = intArrtoInt64Arr(enc.AttentionMask)
+		typeIds[i] = intArrtoInt64Arr(enc.TypeIds)
 		for j := range sl {
-			tokenIds[startIdx+j] = int64(enc.Ids[j])
-			attentionMask[startIdx+j] = int64(enc.AttentionMask[j])
-			typeIds[startIdx+j] = int64(enc.TypeIds[j])
+			flattenedTokenIds[startIdx+j] = int64(enc.Ids[j])
+			flattenedAttentionMask[startIdx+j] = int64(enc.AttentionMask[j])
+			flattenedTypeIds[startIdx+j] = int64(enc.TypeIds[j])
 		}
 	}
 
 	return EncodedBatch{
-		TokenIds:       tokenIds,
-		AttentionMask:  attentionMask,
-		TypeIds:        typeIds,
-		BatchSize:      int64(n),
-		SequenceLength: int64(sl),
-	}
+		FlattenedTokenIds:       flattenedTokenIds,
+		FlattenedAttentionMasks: flattenedAttentionMask,
+		FlattenedTypeIds:        flattenedTypeIds,
+		TokenIds:                tokenIds,
+		AttentionMasks:          attentionMasks,
+		TypeIds:                 typeIds,
+		BatchSize:               int64(n),
+		SequenceLength:          int64(sl),
+	}, nil
 }
 
-func Encode(text string, withSpecialTokens bool) (encoding Encoding) {
+func Encode(text string, withSpecialTokens bool) (encoding Encoding, err error) {
 	tk := getTokenizer()
 	en, err := tk.EncodeSingle(text, withSpecialTokens)
 	if err != nil {
-		log.Fatal(err)
+		return Encoding{}, fmt.Errorf("failed to encode text: %w", err)
 	}
 
 	tks := Tokens{
@@ -116,7 +128,7 @@ func Encode(text string, withSpecialTokens bool) (encoding Encoding) {
 		Tokens:        tks,
 		AttentionMask: am,
 		TypeIds:       tIds,
-	}
+	}, nil
 }
 
 func intArrtoInt64Arr(arr []int) (conv []int64) {

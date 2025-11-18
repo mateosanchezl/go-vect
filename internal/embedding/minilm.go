@@ -2,7 +2,6 @@ package embedding
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/mateosanchezl/go-vect/internal/tokenizer"
@@ -12,7 +11,10 @@ import (
 type MiniLM struct{}
 
 func (m *MiniLM) Embed(chunk string) (embedding EmbeddingVector, err error) {
-	enc := tokenizer.Encode(chunk, true)
+	enc, err := tokenizer.Encode(chunk, true)
+	if err != nil {
+		return EmbeddingVector{}, fmt.Errorf("failed to encode chunk: %w", err)
+	}
 	tokens := enc.Tokens
 	attentionMask := enc.AttentionMask
 	tIds := enc.TypeIds
@@ -21,21 +23,21 @@ func (m *MiniLM) Embed(chunk string) (embedding EmbeddingVector, err error) {
 	// Create input id tensor
 	inputIds, err := ort.NewTensor(ort.NewShape(1, tokens.Length), tokens.Ids)
 	if err != nil {
-		log.Fatal("error creating input id tensor: ", err)
+		return EmbeddingVector{}, fmt.Errorf("failed to create input id tensor: %w", err)
 	}
 	defer inputIds.Destroy()
 
 	// Create attention mask tensor
 	attMask, err := ort.NewTensor(ort.NewShape(1, attentionMask.Length), attentionMask.Mask)
 	if err != nil {
-		log.Fatal("error creating attention mask tensor: ", err)
+		return EmbeddingVector{}, fmt.Errorf("failed to create attention mask tensor: %w", err)
 	}
 	defer attMask.Destroy()
 
 	// Create token type id tensor
 	typeIds, err := ort.NewTensor(ort.NewShape(1, tIds.Length), tIds.Ids)
 	if err != nil {
-		log.Fatal("error creating type id tensor: ", err)
+		return EmbeddingVector{}, fmt.Errorf("failed to create type id tensor: %w", err)
 	}
 	defer typeIds.Destroy()
 
@@ -43,7 +45,7 @@ func (m *MiniLM) Embed(chunk string) (embedding EmbeddingVector, err error) {
 	outputShape := ort.NewShape(1, tokens.Length, 384) // batch size, sequence length, hidden size (from mini lm)
 	outputTensor, err := ort.NewEmptyTensor[float32](outputShape)
 	if err != nil {
-		log.Fatal("error creating output tensor: ", err)
+		return EmbeddingVector{}, fmt.Errorf("failed to create output tensor: %w", err)
 	}
 	defer outputTensor.Destroy()
 
@@ -55,13 +57,13 @@ func (m *MiniLM) Embed(chunk string) (embedding EmbeddingVector, err error) {
 		nil,
 	)
 	if err != nil {
-		log.Fatal("failed creating session with model.onnx: ", err)
+		return EmbeddingVector{}, fmt.Errorf("failed to create ONNX session: %w", err)
 	}
 	defer session.Destroy()
 
 	err = session.Run()
 	if err != nil {
-		log.Fatal("failed to run session: ", err)
+		return EmbeddingVector{}, fmt.Errorf("failed to run ONNX session: %w", err)
 	}
 
 	elapsed := time.Since(start)
@@ -80,24 +82,27 @@ func (m *MiniLM) Embed(chunk string) (embedding EmbeddingVector, err error) {
 
 func (m *MiniLM) EmbedBatch(chunks []string) (embeddings []EmbeddingVector, err error) {
 	// Tokenize and prepare chunks
-	encs := tokenizer.EncodeBatch(chunks, true)
+	encs, err := tokenizer.EncodeBatch(chunks, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode batch: %w", err)
+	}
 
 	// Create input tensors
-	inputIds, err := ort.NewTensor(ort.NewShape(encs.BatchSize, encs.SequenceLength), encs.TokenIds)
+	inputIds, err := ort.NewTensor(ort.NewShape(encs.BatchSize, encs.SequenceLength), encs.FlattenedTokenIds)
 	if err != nil {
-		log.Fatal("error creating input id tensor: ", err)
+		return nil, fmt.Errorf("failed to create input id tensor: %w", err)
 	}
 	defer inputIds.Destroy()
 
-	attMask, err := ort.NewTensor(ort.NewShape(encs.BatchSize, encs.SequenceLength), encs.AttentionMask)
+	attMask, err := ort.NewTensor(ort.NewShape(encs.BatchSize, encs.SequenceLength), encs.FlattenedAttentionMasks)
 	if err != nil {
-		log.Fatal("error creating attention mask tensor: ", err)
+		return nil, fmt.Errorf("failed to create attention mask tensor: %w", err)
 	}
 	defer attMask.Destroy()
 
-	typeIds, err := ort.NewTensor(ort.NewShape(encs.BatchSize, encs.SequenceLength), encs.TypeIds)
+	typeIds, err := ort.NewTensor(ort.NewShape(encs.BatchSize, encs.SequenceLength), encs.FlattenedTypeIds)
 	if err != nil {
-		log.Fatal("error creating type id tensor: ", err)
+		return nil, fmt.Errorf("failed to create type id tensor: %w", err)
 	}
 	defer typeIds.Destroy()
 
@@ -105,7 +110,7 @@ func (m *MiniLM) EmbedBatch(chunks []string) (embeddings []EmbeddingVector, err 
 	outputShape := ort.NewShape(encs.BatchSize, encs.SequenceLength, 384) // batch size, sequence length, hidden size (from mini lm)
 	outputTensor, err := ort.NewEmptyTensor[float32](outputShape)
 	if err != nil {
-		log.Fatal("error creating output tensor: ", err)
+		return nil, fmt.Errorf("failed to create output tensor: %w", err)
 	}
 	defer outputTensor.Destroy()
 
@@ -117,16 +122,30 @@ func (m *MiniLM) EmbedBatch(chunks []string) (embeddings []EmbeddingVector, err 
 		nil,
 	)
 	if err != nil {
-		log.Fatal("failed creating session with model.onnx: ", err)
+		return nil, fmt.Errorf("failed to create ONNX session: %w", err)
 	}
 	defer session.Destroy()
 
 	err = session.Run()
 	if err != nil {
-		log.Fatal("failed to run session: ", err)
+		return nil, fmt.Errorf("failed to run ONNX session: %w", err)
 	}
 
-	return embeddings, nil
+	outputData := outputTensor.GetData()
+
+	pooled := meanPoolBatch(outputData, int(encs.BatchSize), 384, int(encs.SequenceLength), encs.AttentionMasks)
+
+	validated := make([]EmbeddingVector, encs.BatchSize)
+
+	for i, p := range pooled {
+		v, err := NewVector(p, 384)
+		if err != nil {
+			return nil, err
+		}
+		validated[i] = v
+	}
+
+	return validated, nil
 }
 
 // Apply attention masked mean pooling for a single embedding output, assumed batch size 1
@@ -158,4 +177,48 @@ func meanPoolSingle(rawOut []float32, hiddenSize int, seqLength int, attentionMa
 	elapsed := time.Since(start)
 	fmt.Println("Mean pooled in", elapsed.Milliseconds(), "ms")
 	return out
+}
+
+func meanPoolBatch(rawOut []float32, batchSize int, hiddenSize int, seqLength int, attentionMasks [][]int64) [][]float32 {
+	start := time.Now()
+
+	vectorsRaw := make([][]float32, batchSize)
+
+	for j := range batchSize {
+		ofs := seqLength * hiddenSize // Raw vector size
+		vectorsRaw[j] = rawOut[j*ofs : (j+1)*ofs]
+	}
+
+	outs := make([][]float32, batchSize)
+	for y := range batchSize {
+		raw := vectorsRaw[y]
+		// Split raw vect into vector embedding per token
+		split := make([][]float32, seqLength)
+		for i := range seqLength {
+			split[i] = raw[i*hiddenSize : (i+1)*hiddenSize]
+		}
+
+		// Get valid token indices
+		r := make([]int, 0)
+		for i := range attentionMasks[y] {
+			if attentionMasks[y][i] == 1 {
+				r = append(r, i)
+			}
+		}
+
+		out := make([]float32, hiddenSize)
+
+		for i := range hiddenSize {
+			var sum float32
+			for _, idx := range r {
+				sum += split[idx][i]
+			}
+			out[i] = sum / float32(len(r))
+		}
+
+		outs[y] = out
+	}
+	elapsed := time.Since(start)
+	fmt.Println("Mean pooled batch in", elapsed.Milliseconds(), "ms")
+	return outs
 }

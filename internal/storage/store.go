@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"strings"
@@ -13,25 +12,27 @@ import (
 )
 
 // Appends embedding to data file
-func StoreEmbedding(embedding embedding.EmbeddingVector, text string) {
+func StoreEmbedding(embedding embedding.EmbeddingVector, text string) error {
 	bs := vectorToByteSlice(embedding)
 
 	file, err := os.OpenFile("internal/db/data.bin", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		log.Fatal("failed to open data file:", err)
+		return fmt.Errorf("failed to open data file: %w", err)
 	}
 	defer file.Close()
 
 	_, err = file.Write(bs)
 	if err != nil {
-		log.Fatal("failed to write embedding to data file:", err)
+		return fmt.Errorf("failed to write embedding to data file: %w", err)
 	}
 
 	// Store embedding metadata
 	err = storeEmbeddingMetaData(embedding, text)
 	if err != nil {
-		log.Fatalln("error storing embedding metadata: ", err)
+		return fmt.Errorf("failed to store embedding metadata: %w", err)
 	}
+
+	return nil
 }
 
 // Turns an embedding vector into a single byte slice
@@ -59,7 +60,10 @@ func storeEmbeddingMetaData(embedding embedding.EmbeddingVector, text string) (e
 	}
 	defer file.Close()
 
-	ofs := calculateOffset(embedding)
+	ofs, err := calculateOffset(embedding)
+	if err != nil {
+		return fmt.Errorf("failed to calculate offset: %w", err)
+	}
 
 	md := EmbeddingMetaData{
 		Offset: ofs,
@@ -81,14 +85,14 @@ func storeEmbeddingMetaData(embedding embedding.EmbeddingVector, text string) (e
 	return nil
 }
 
-func calculateOffset(embedding embedding.EmbeddingVector) int {
+func calculateOffset(embedding embedding.EmbeddingVector) (int, error) {
 	last, err := getLastOffset()
 	if err != nil {
-		log.Fatalln(err)
+		return 0, fmt.Errorf("failed to get last offset: %w", err)
 	}
 
 	byteCount := len(embedding) * 4
-	return last + byteCount
+	return last + byteCount, nil
 }
 
 // Gets the last offset recorded in metadata if available
@@ -122,13 +126,14 @@ func getLastOffset() (offset int, err error) {
 	return lastMd.Offset, nil
 }
 
-func ClearData() {
+func ClearData() error {
 	paths := []string{"internal/db/metadata.jsonl", "internal/db/data.bin"}
 	for _, p := range paths {
 		f, err := os.OpenFile(p, os.O_RDWR|os.O_TRUNC, 0644)
 		if err != nil {
-			log.Fatalln("error clearing data files: ", err)
+			return fmt.Errorf("failed to clear data file %s: %w", p, err)
 		}
 		defer f.Close()
 	}
+	return nil
 }
