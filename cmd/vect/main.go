@@ -6,7 +6,9 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/mateosanchezl/go-vect/internal/chunking"
 	"github.com/mateosanchezl/go-vect/internal/config"
 	"github.com/mateosanchezl/go-vect/internal/embedding"
 	"github.com/mateosanchezl/go-vect/internal/search"
@@ -19,6 +21,10 @@ func main() {
 		log.Fatal("failed to load config:", err)
 	}
 
+	chunker := chunking.FixedChunker{
+		ChunkSize: 150,
+	}
+
 	// model := embedding.HfEmbeddingModel{
 	// 	Token:    os.Getenv("HUGGING_FACE_INFERENCE_API_TOKEN"),
 	// 	ModelUrl: "https://router.huggingface.co/hf-inference/models/BAAI/bge-base-en-v1.5/pipeline/feature-extraction",
@@ -27,7 +33,7 @@ func main() {
 	model := embedding.MiniLM{}
 
 	for {
-		fmt.Print("\nInput text to embed and store, s to search, d to delete data, q to quit : ")
+		fmt.Print("\nInput text to embed and store, f for file embedding, s to search, d to delete data, q to quit : ")
 		rd := bufio.NewReader(os.Stdin)
 
 		text, err := rd.ReadString('\n')
@@ -36,6 +42,35 @@ func main() {
 		}
 
 		str := strings.TrimSpace(string(text))
+		if str == "f" {
+			fmt.Print("Input file path: ")
+			if err != nil {
+				log.Fatal("failed to read file path")
+			}
+
+			filePath, err := rd.ReadString('\n')
+			if err != nil {
+				log.Fatal("failed to read file path")
+			}
+
+			filePath = strings.TrimSpace(filePath)
+			f, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Fatal("failed to read file:", err)
+			}
+
+			chunks := chunker.Chunk(string(f))
+			start := time.Now()
+
+			_, err = model.EmbedBatch(chunks)
+			if err != nil {
+				log.Fatal("failed to embed batch:", err)
+			}
+
+			elapsed := time.Since(start)
+			fmt.Printf("Embedded %d chunks in %s\n", len(chunks), elapsed)
+			continue
+		}
 
 		if str == "q" {
 			fmt.Println("Bye!")
@@ -62,42 +97,19 @@ func main() {
 			}
 
 		} else {
-			emb, err := model.Embed(str)
-			if err != nil {
-				log.Fatal("failed to embed:", err)
+			chunks := chunker.Chunk(str)
+
+			start := time.Now()
+			embeddings, err := model.EmbedBatch(chunks)
+			for _, embedding := range embeddings {
+				fmt.Printf("Embedding: %v\n", len(embedding))
 			}
-
-			storage.StoreEmbedding(emb, str)
 			if err != nil {
-				log.Fatal("failed to store embedding metadata:", err)
+				log.Fatal("failed to embed batch:", err)
 			}
-			fmt.Println("✓ Embedding stored successfully")
-
-			// 	for _, em := range embeddings {
-			// 		storage.StoreEmbedding(em)
-			// 		fmt.Println("Successfully stored embedding")
-			// 	}
-
-			// 	for i, ch := range chunks {
-			// 		ofs, err := storage.GetLastOffset()
-			// 		if err != nil {
-			// 			log.Fatal("failed to get last offset:", err)
-			// 		}
-
-			// 		ofs += (len(embeddings[i]) * 8)
-			// 		md := storage.EmbeddingMetaData{
-			// 			Offset: ofs,
-			// 			Text:   ch,
-			// 		}
-
-			// 		err = storage.StoreEmbeddingMetaData(md)
-			// 		if err != nil {
-			// 			log.Fatal("failed to store embedding metadata:", err)
-			// 		}
-
-			// 		fmt.Printf("Using offset: %v\n", ofs)
-			// 	}
-			// }
+			elapsed := time.Since(start)
+			fmt.Printf("Embedded %d chunks in %s\n", len(chunks), elapsed)
+			continue
 		}
 	}
 }

@@ -1,12 +1,15 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
 
+	"github.com/sugarme/tokenizer"
+	"github.com/sugarme/tokenizer/pretrained"
 	ort "github.com/yalue/onnxruntime_go"
 
 	"github.com/joho/godotenv"
@@ -14,6 +17,8 @@ import (
 
 var (
 	ortInitOnce sync.Once
+	tkInitOnce  sync.Once
+	Tokenizer   *tokenizer.Tokenizer // For global use
 )
 
 func LoadConfig() (err error) {
@@ -32,24 +37,42 @@ func LoadConfig() (err error) {
 }
 
 func initEnv() {
-	initTokenizerPath()
+	initTokenizer()
 	initOnnxRuntime()
 }
 
-func initTokenizerPath() {
-	tokenizerPath := os.Getenv("TOKENIZER_JSON")
-	if tokenizerPath == "" {
-		tokenizerPath = "models/all-MiniLM-L6-v2/tokenizer.json"
-	}
-
-	if !filepath.IsAbs(tokenizerPath) {
-		wd, err := os.Getwd()
-		if err == nil {
-			tokenizerPath = filepath.Join(wd, tokenizerPath)
+func initTokenizer() {
+	tkInitOnce.Do(func() {
+		tokenizerPath := os.Getenv("TOKENIZER_JSON")
+		if tokenizerPath == "" {
+			tokenizerPath = "models/all-MiniLM-L6-v2/tokenizer.json"
 		}
-	}
 
-	os.Setenv("TOKENIZER_JSON", tokenizerPath)
+		if !filepath.IsAbs(tokenizerPath) {
+			wd, err := os.Getwd()
+			if err == nil {
+				tokenizerPath = filepath.Join(wd, tokenizerPath)
+			}
+		}
+
+		tk, err := pretrained.FromFile(tokenizerPath)
+		if err != nil {
+			log.Fatal("error in initialising tokeniser: ", err)
+		}
+
+		// Values from the MiniLM tokeniser config
+		tk.WithTruncation(&tokenizer.TruncationParams{MaxLength: 384, Strategy: tokenizer.LongestFirst})
+		tk.WithPadding(&tokenizer.PaddingParams{
+			Strategy:  *tokenizer.NewPaddingStrategy(tokenizer.WithFixed(128)),
+			Direction: tokenizer.Right,
+			PadId:     0,
+			PadTypeId: 0,
+			PadToken:  "[PAD]",
+		})
+
+		Tokenizer = tk
+		fmt.Println("tokenizer initialised")
+	})
 }
 
 func initOnnxRuntime() {
@@ -62,6 +85,7 @@ func initOnnxRuntime() {
 		if err != nil {
 			log.Fatalln("failed loading onnx runtime: ", err)
 		}
+		fmt.Println("onnx runtime initialised")
 	})
 }
 

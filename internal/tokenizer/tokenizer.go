@@ -2,9 +2,9 @@ package tokenizer
 
 import (
 	"log"
-	"os"
 
-	"github.com/sugarme/tokenizer/pretrained"
+	"github.com/mateosanchezl/go-vect/internal/config"
+	"github.com/sugarme/tokenizer"
 )
 
 type Tokens struct {
@@ -23,17 +23,74 @@ type TypeIds struct {
 	Length int64
 }
 
-func Encode(text string, withSpecialTokens bool) (tokens Tokens, attentionMask AttentionMask, typeIds TypeIds) {
-	tokenizerPath := os.Getenv("TOKENIZER_JSON")
-	if tokenizerPath == "" {
-		log.Fatal("failed getting TOKENIZER_JSON env variable, did you run make setup?")
+type Encoding struct {
+	Tokens        Tokens
+	AttentionMask AttentionMask
+	TypeIds       TypeIds
+}
+
+type EncodedBatch struct {
+	TokenIds       []int64
+	AttentionMask  []int64
+	TypeIds        []int64
+	BatchSize      int64
+	SequenceLength int64
+}
+
+func getTokenizer() *tokenizer.Tokenizer {
+	if config.Tokenizer == nil {
+		panic("tokenizer not initialised. ensure config is loaded. see config.LoadConfig()")
+	}
+	return config.Tokenizer
+}
+
+func EncodeBatch(texts []string, withSpecialTokens bool) (encodedBatch EncodedBatch) {
+	tk := getTokenizer()
+
+	inputs := make([]tokenizer.EncodeInput, len(texts))
+
+	for i, text := range texts {
+		seq := tokenizer.NewInputSequence(text)
+		inputs[i] = tokenizer.NewSingleEncodeInput(seq)
 	}
 
-	tk, err := pretrained.FromFile(tokenizerPath)
+	encs, err := tk.EncodeBatch(inputs, withSpecialTokens)
 	if err != nil {
-		log.Fatal("error tokenising from pretrained: ", err)
+		log.Fatal(err)
 	}
 
+	n := len(encs)
+	if n == 0 {
+		log.Fatal("no encodings returned from tokenizer.EncodeBatch")
+	}
+
+	sl := len(encs[0].GetIds())
+
+	// Flatten encodings into single slice
+	tokenIds := make([]int64, n*sl)
+	attentionMask := make([]int64, n*sl)
+	typeIds := make([]int64, n*sl)
+
+	for i, enc := range encs {
+		startIdx := i * sl
+		for j := range sl {
+			tokenIds[startIdx+j] = int64(enc.Ids[j])
+			attentionMask[startIdx+j] = int64(enc.AttentionMask[j])
+			typeIds[startIdx+j] = int64(enc.TypeIds[j])
+		}
+	}
+
+	return EncodedBatch{
+		TokenIds:       tokenIds,
+		AttentionMask:  attentionMask,
+		TypeIds:        typeIds,
+		BatchSize:      int64(n),
+		SequenceLength: int64(sl),
+	}
+}
+
+func Encode(text string, withSpecialTokens bool) (encoding Encoding) {
+	tk := getTokenizer()
 	en, err := tk.EncodeSingle(text, withSpecialTokens)
 	if err != nil {
 		log.Fatal(err)
@@ -55,7 +112,11 @@ func Encode(text string, withSpecialTokens bool) (tokens Tokens, attentionMask A
 		Length: int64(len(en.TypeIds)),
 	}
 
-	return tks, am, tIds
+	return Encoding{
+		Tokens:        tks,
+		AttentionMask: am,
+		TypeIds:       tIds,
+	}
 }
 
 func intArrtoInt64Arr(arr []int) (conv []int64) {
