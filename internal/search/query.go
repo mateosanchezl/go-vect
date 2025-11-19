@@ -37,8 +37,9 @@ func GetSimilar(query string, model embedding.EmbeddingModel) (results []string,
 	if err != nil {
 		return nil, err
 	}
-	scores := make([]similarityResult, 0)
+	qv.Normalise()
 
+	scores := make([]similarityResult, 0)
 	worst := similarityResult{
 		1, 1, embedding.EmbeddingVector{},
 	}
@@ -47,7 +48,7 @@ func GetSimilar(query string, model embedding.EmbeddingModel) (results []string,
 	}
 
 	for i, cv := range evs {
-		sim, err := CosineSimilarity(cv, qv)
+		sim, err := cv.NormedCosineSimilarity(qv)
 		if err != nil {
 			return nil, err
 		}

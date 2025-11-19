@@ -13,6 +13,8 @@ import (
 
 // Appends embedding to data file
 func StoreEmbedding(embedding embedding.EmbeddingVector, text string) error {
+	embedding.Normalise()
+
 	bs := vectorToByteSlice(embedding)
 
 	file, err := os.OpenFile("internal/db/data.bin", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
@@ -79,8 +81,6 @@ func storeEmbeddingMetaData(embedding embedding.EmbeddingVector, text string) (e
 	if err != nil {
 		return err
 	}
-
-	fmt.Println("wrote: ", string(mdJson))
 
 	return nil
 }
