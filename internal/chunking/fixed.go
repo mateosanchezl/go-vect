@@ -5,17 +5,23 @@ type FixedChunker struct {
 }
 
 func (fc *FixedChunker) Chunk(text string) (chunks []string) {
-	if len(text) < fc.ChunkSize {
+	if fc.ChunkSize <= 0 {
 		return []string{text}
 	}
 
-	out := []string{}
-	for i := 0; i < len(text); i += fc.ChunkSize {
-		if i+fc.ChunkSize >= len(text) {
-			out = append(out, text[i:])
-			break
-		}
-		out = append(out, text[i:i+fc.ChunkSize])
+	runes := []rune(text)
+	if len(runes) == 0 {
+		return []string{}
+	}
+
+	if len(runes) <= fc.ChunkSize {
+		return []string{text}
+	}
+
+	out := make([]string, 0, (len(runes)+fc.ChunkSize-1)/fc.ChunkSize)
+	for i := 0; i < len(runes); i += fc.ChunkSize {
+		end := min(len(runes), i+fc.ChunkSize)
+		out = append(out, string(runes[i:end]))
 	}
 
 	return out
