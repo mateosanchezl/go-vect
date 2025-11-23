@@ -12,7 +12,6 @@
 *.test
 *.out
 go.work
-vect
 
 # IDE
 .vscode/

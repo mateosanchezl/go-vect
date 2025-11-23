@@ -22,7 +22,7 @@ var (
 	Tokenizer   *tokenizer.Tokenizer // For global use
 )
 
-func LoadConfig() (err error) {
+func Load() (err error) {
 	err = initEnv()
 	if err != nil {
 		return fmt.Errorf("failed to initialize environment: %w", err)
@@ -49,6 +49,32 @@ func initEnv() error {
 	err = initOnnxRuntime()
 	if err != nil {
 		return fmt.Errorf("failed to initialize ONNX runtime: %w", err)
+	}
+
+	err = initDbPaths()
+	if err != nil {
+		return fmt.Errorf("failed to initialize database paths: %w", err)
+	}
+
+	return nil
+}
+
+func initDbPaths() error {
+	vectorDbPath := os.Getenv("VECTOR_DB_PATH")
+	metadataDbPath := os.Getenv("METADATA_DB_PATH")
+
+	if vectorDbPath == "" {
+		err := os.Setenv("VECTOR_DB_PATH", "internal/db/data.bin")
+		if err != nil {
+			return fmt.Errorf("failed to set vector db path: %w", err)
+		}
+	}
+
+	if metadataDbPath == "" {
+		err := os.Setenv("METADATA_DB_PATH", "internal/db/metadata.jsonl")
+		if err != nil {
+			return fmt.Errorf("failed to set metadata db path: %w", err)
+		}
 	}
 
 	return nil

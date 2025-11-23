@@ -17,7 +17,7 @@ func StoreEmbedding(embedding embedding.EmbeddingVector, text string) error {
 
 	bs := vectorToByteSlice(embedding)
 
-	file, err := os.OpenFile("internal/db/data.bin", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile(os.Getenv("VECTOR_DB_PATH"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open data file: %w", err)
 	}
@@ -56,7 +56,7 @@ type EmbeddingMetaData struct {
 }
 
 func storeEmbeddingMetaData(embedding embedding.EmbeddingVector, text string) (err error) {
-	file, err := os.OpenFile("internal/db/metadata.jsonl", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile(os.Getenv("METADATA_DB_PATH"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func calculateOffset(embedding embedding.EmbeddingVector) (int, error) {
 
 // Gets the last offset recorded in metadata if available
 func getLastOffset() (offset int, err error) {
-	data, err := os.ReadFile("internal/db/metadata.jsonl")
+	data, err := os.ReadFile(os.Getenv("METADATA_DB_PATH"))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return 0, nil // File doesn't exist, start at 0
@@ -127,9 +127,9 @@ func getLastOffset() (offset int, err error) {
 }
 
 func ClearData() error {
-	paths := []string{"internal/db/metadata.jsonl", "internal/db/data.bin"}
+	paths := []string{os.Getenv("VECTOR_DB_PATH"), os.Getenv("METADATA_DB_PATH")}
 	for _, p := range paths {
-		f, err := os.OpenFile(p, os.O_RDWR|os.O_TRUNC, 0644)
+		f, err := os.OpenFile(p, os.O_RDWR|os.O_TRUNC, 0o644)
 		if err != nil {
 			return fmt.Errorf("failed to clear data file %s: %w", p, err)
 		}

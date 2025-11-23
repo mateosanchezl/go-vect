@@ -3,7 +3,6 @@ package search
 import (
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"math"
 	"os"
 	"strings"
@@ -66,7 +65,7 @@ func SearchTopKSimilar(query string, k int, model embedding.EmbeddingModel) (res
 func readVectors() (evs []embedding.EmbeddingVector, err error) {
 	evs = []embedding.EmbeddingVector{}
 
-	data, err := os.ReadFile("internal/db/data.bin")
+	data, err := os.ReadFile(os.Getenv("VECTOR_DB_PATH"))
 	if err != nil {
 		return evs, err
 	}
@@ -97,14 +96,13 @@ func readVectors() (evs []embedding.EmbeddingVector, err error) {
 }
 
 func readMetadata() (lines []string, err error) {
-	md, err := os.ReadFile("internal/db/metadata.jsonl")
+	md, err := os.ReadFile(os.Getenv("METADATA_DB_PATH"))
 	if err != nil {
 		if os.IsNotExist(err) {
-			_, err = os.Create("internal/db/metadata.jsonl")
+			_, err = os.Create(os.Getenv("METADATA_DB_PATH")) // Create file if it doesn't exist
 			if err != nil {
 				return nil, err
 			}
-			fmt.Println("could not find metadata file, created it successfuly.")
 			return []string{}, nil
 		}
 	}

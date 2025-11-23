@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	err := config.LoadConfig()
+	err := config.Load()
 	if err != nil {
 		log.Fatal("failed to load config:", err)
 	}
@@ -61,12 +61,9 @@ func main() {
 			elapsed := time.Since(start)
 			fmt.Printf("Embedded %d chunks in %s\n", len(chunks), elapsed)
 
-			start = time.Now()
 			for i, e := range embeddings {
 				storage.StoreEmbedding(e, chunks[i])
 			}
-			storeElapsed := time.Since(start)
-			fmt.Printf("Stored in: %s\n", storeElapsed)
 			continue
 		}
 

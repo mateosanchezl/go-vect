@@ -2,7 +2,6 @@ package embedding
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/mateosanchezl/go-vect/internal/tokenizer"
 	ort "github.com/yalue/onnxruntime_go"
@@ -19,7 +18,6 @@ func (m *MiniLM) Embed(chunk string) (embedding EmbeddingVector, err error) {
 	attentionMask := enc.AttentionMask
 	tIds := enc.TypeIds
 
-	start := time.Now()
 	// Create input id tensor
 	inputIds, err := ort.NewTensor(ort.NewShape(1, tokens.Length), tokens.Ids)
 	if err != nil {
@@ -65,9 +63,6 @@ func (m *MiniLM) Embed(chunk string) (embedding EmbeddingVector, err error) {
 	if err != nil {
 		return EmbeddingVector{}, fmt.Errorf("failed to run ONNX session: %w", err)
 	}
-
-	elapsed := time.Since(start)
-	fmt.Println("Embedded in", elapsed.Milliseconds(), "ms")
 
 	outputData := outputTensor.GetData()
 	pooled := meanPoolSingle(outputData, 384, int(tokens.Length), attentionMask.Mask)
@@ -177,7 +172,6 @@ func meanPoolSingle(rawOut []float32, hiddenSize int, seqLength int, attentionMa
 }
 
 func meanPoolBatch(rawOut []float32, batchSize int, hiddenSize int, seqLength int, attentionMasks [][]int64) [][]float32 {
-
 	vectorsRaw := make([][]float32, batchSize)
 
 	for j := range batchSize {
