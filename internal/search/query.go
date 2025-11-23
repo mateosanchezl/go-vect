@@ -12,23 +12,18 @@ import (
 	"github.com/mateosanchezl/go-vect/internal/storage"
 )
 
-type SimilaritySearchResult struct {
-	text       string
-	similarity float32
+type SimilarityResult struct {
+	CosSim float32
+	Pos    int
 }
 
-func (r SimilaritySearchResult) String() string {
-	return fmt.Sprintf("Text: %s\nSimilarity Score: %.4f", r.text, r.similarity)
+type TopKSearchResult struct {
+	CosSim float32
+	Text   string
 }
 
-type similarityResult struct {
-	similarity float32
-	pos        int
-	vect       embedding.EmbeddingVector
-}
-
-func GetSimilar(query string, model embedding.EmbeddingModel) (results []string, err error) {
-	evs, err := getVectors()
+func SearchTopKSimilar(query string, k int, model embedding.EmbeddingModel) (results []TopKSearchResult, err error) {
+	evs, err := readVectors()
 	if err != nil {
 		return nil, err
 	}
@@ -39,84 +34,36 @@ func GetSimilar(query string, model embedding.EmbeddingModel) (results []string,
 	}
 	qv.Normalise()
 
-	scores := make([]similarityResult, 0)
-	worst := similarityResult{
-		1, 1, embedding.EmbeddingVector{},
-	}
-	best := similarityResult{
-		0, 0, embedding.EmbeddingVector{},
-	}
-
+	mh := MinHeap{}
+	mh.Init(k)
 	for i, cv := range evs {
 		sim, err := cv.NormedCosineSimilarity(qv)
+		mh.Insert(SimilarityResult{CosSim: sim, Pos: i})
 		if err != nil {
 			return nil, err
 		}
-		rs := similarityResult{
-			similarity: sim,
-			pos:        i,
-		}
-		if sim > best.similarity {
-			best.similarity = sim
-			best.pos = i
-			best.vect = cv
-		}
-		if sim < worst.similarity {
-			worst.similarity = sim
-			worst.pos = i
-			worst.vect = cv
-		}
-		scores = append(scores, rs)
 	}
+	mh.Sort()
 
-	md, err := os.ReadFile("internal/db/metadata.jsonl")
+	md, err := readMetadata()
 	if err != nil {
-		if os.IsNotExist(err) {
-			_, err = os.Create("internal/db/metadata.jsonl")
-			if err != nil {
-				return nil, err
-			}
-			fmt.Println("could not find metadata file, created successfuly.")
-			return []string{}, nil
+		return nil, err
+	}
+
+	out := make([]TopKSearchResult, k)
+	for i, rs := range mh.H {
+		var record storage.EmbeddingMetaData
+		json.Unmarshal([]byte(md[rs.Pos]), &record)
+		out[i] = TopKSearchResult{
+			Text:   record.Text,
+			CosSim: rs.CosSim,
 		}
 	}
 
-	if len(md) == 0 {
-		return []string{}, nil
-	}
-
-	lines := strings.Split(strings.TrimSpace(string(md)), "\n")
-	if len(lines) == 0 {
-		return []string{}, nil
-	}
-
-	var bestMd, worstMd storage.EmbeddingMetaData
-
-	json.Unmarshal([]byte(lines[best.pos]), &bestMd)
-	json.Unmarshal([]byte(lines[worst.pos]), &worstMd)
-
-	bestRes := SimilaritySearchResult{
-		similarity: best.similarity,
-		text:       bestMd.Text,
-	}
-
-	worstRes := SimilaritySearchResult{
-		similarity: worst.similarity,
-		text:       worstMd.Text,
-	}
-
-	fmt.Println("\n" + strings.Repeat("=", 80))
-	fmt.Println("SEARCH RESULTS")
-	fmt.Println(strings.Repeat("=", 80))
-	fmt.Println("\n🏆 Best Match:")
-	fmt.Printf("   %s\n", strings.ReplaceAll(bestRes.String(), "\n", "\n   "))
-	fmt.Println("\n📉 Worst Match:")
-	fmt.Printf("   %s\n", strings.ReplaceAll(worstRes.String(), "\n", "\n   "))
-	fmt.Println(strings.Repeat("=", 80) + "\n")
-	return
+	return out, nil
 }
 
-func getVectors() (evs []embedding.EmbeddingVector, err error) {
+func readVectors() (evs []embedding.EmbeddingVector, err error) {
 	evs = []embedding.EmbeddingVector{}
 
 	data, err := os.ReadFile("internal/db/data.bin")
@@ -147,4 +94,29 @@ func getVectors() (evs []embedding.EmbeddingVector, err error) {
 	}
 
 	return evs, nil
+}
+
+func readMetadata() (lines []string, err error) {
+	md, err := os.ReadFile("internal/db/metadata.jsonl")
+	if err != nil {
+		if os.IsNotExist(err) {
+			_, err = os.Create("internal/db/metadata.jsonl")
+			if err != nil {
+				return nil, err
+			}
+			fmt.Println("could not find metadata file, created it successfuly.")
+			return []string{}, nil
+		}
+	}
+
+	if len(md) == 0 {
+		return []string{}, nil
+	}
+
+	lines = strings.Split(strings.TrimSpace(string(md)), "\n")
+	if len(lines) == 0 {
+		return []string{}, nil
+	}
+
+	return lines, nil
 }

@@ -34,7 +34,4 @@ models/**/*
 !models/.gitkeep
 !models/**/.gitkeep
 
-# Libraries
-libs/tokenizers/
-
 todo.md

@@ -150,7 +150,6 @@ func (m *MiniLM) EmbedBatch(chunks []string) (embeddings []EmbeddingVector, err 
 
 // Apply attention masked mean pooling for a single embedding output, assumed batch size 1
 func meanPoolSingle(rawOut []float32, hiddenSize int, seqLength int, attentionMask []int64) []float32 {
-	start := time.Now()
 	// Split output into vector embedding per token
 	split := make([][]float32, seqLength)
 	for i := range seqLength {
@@ -174,13 +173,10 @@ func meanPoolSingle(rawOut []float32, hiddenSize int, seqLength int, attentionMa
 		}
 		out[i] = sum / float32(len(r))
 	}
-	elapsed := time.Since(start)
-	fmt.Println("Mean pooled in", elapsed.Milliseconds(), "ms")
 	return out
 }
 
 func meanPoolBatch(rawOut []float32, batchSize int, hiddenSize int, seqLength int, attentionMasks [][]int64) [][]float32 {
-	start := time.Now()
 
 	vectorsRaw := make([][]float32, batchSize)
 
@@ -218,7 +214,5 @@ func meanPoolBatch(rawOut []float32, batchSize int, hiddenSize int, seqLength in
 
 		outs[y] = out
 	}
-	elapsed := time.Since(start)
-	fmt.Println("Mean pooled batch in", elapsed.Milliseconds(), "ms")
 	return outs
 }

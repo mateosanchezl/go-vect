@@ -25,11 +25,6 @@ func main() {
 		ChunkSize: 150,
 	}
 
-	// model := embedding.HfEmbeddingModel{
-	// 	Token:    os.Getenv("HUGGING_FACE_INFERENCE_API_TOKEN"),
-	// 	ModelUrl: "https://router.huggingface.co/hf-inference/models/BAAI/bge-base-en-v1.5/pipeline/feature-extraction",
-	// }
-
 	model := embedding.MiniLM{}
 
 	for {
@@ -97,10 +92,12 @@ func main() {
 			}
 
 			qs = strings.TrimSpace(string(qs))
-			_, err = search.GetSimilar(qs, &model)
+			rs, err := search.SearchTopKSimilar(qs, 10, &model)
 			if err != nil {
 				log.Fatal("failed to get similar:", err)
 			}
+
+			fmt.Println("Results: ", rs)
 
 		} else {
 			chunks := chunker.Chunk(str)
