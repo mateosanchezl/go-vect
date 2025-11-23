@@ -11,3 +11,5 @@ My aim with this project was never to build the next Pinecone. Instead, it is to
 - Build a semantic search playground
 - Implement a complete embedding pipeline with local inference
 - All while using as few external dependencies as possible
+
+This project is very much an active work in progress, with plans for optimisation, improvements and new additions.
