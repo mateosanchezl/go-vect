@@ -70,14 +70,14 @@ func readVectors() (evs []embedding.EmbeddingVector, err error) {
 		return evs, err
 	}
 
-	bytes_per_vect := 384 * 4
+	bytesPerVect := 384 * 4
 
-	n_vects := len(data) / bytes_per_vect
+	n := len(data) / bytesPerVect
 	ofs := 0
 
-	for range n_vects {
+	for range n {
 		vect := []float32{}
-		for i := 0; i < bytes_per_vect; i += 4 {
+		for i := 0; i < bytesPerVect; i += 4 {
 			fl_bytes := data[ofs+i : ofs+i+4]
 			bits := binary.LittleEndian.Uint32(fl_bytes)
 			vf := math.Float32frombits(bits)
@@ -87,9 +87,8 @@ func readVectors() (evs []embedding.EmbeddingVector, err error) {
 		if err != nil {
 			return evs, err
 		}
-
 		evs = append(evs, v)
-		ofs += bytes_per_vect
+		ofs += bytesPerVect
 	}
 
 	return evs, nil

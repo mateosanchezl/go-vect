@@ -23,19 +23,17 @@ var (
 )
 
 func Load() (err error) {
-	err = initEnv()
-	if err != nil {
-		return fmt.Errorf("failed to initialize environment: %w", err)
-	}
-
 	if _, err := os.Stat(".env"); os.IsNotExist(err) {
 		log.Println("warning: .env file not found. make sure to set this up to use huggingface embedding models via api")
 		return nil
 	}
-
 	err = godotenv.Load()
 	if err != nil {
 		return fmt.Errorf("failed loading env: %w", err)
+	}
+	err = initEnv()
+	if err != nil {
+		return fmt.Errorf("failed to initialize environment: %w", err)
 	}
 	return nil
 }
@@ -54,6 +52,11 @@ func initEnv() error {
 	err = initDbPaths()
 	if err != nil {
 		return fmt.Errorf("failed to initialize database paths: %w", err)
+	}
+
+	err = initModelPath()
+	if err != nil {
+		return fmt.Errorf("failed to initialize model path: %w", err)
 	}
 
 	return nil
@@ -115,6 +118,15 @@ func initTokenizer() error {
 		fmt.Println("tokenizer initialised")
 	})
 	return initErr
+}
+
+func initModelPath() error {
+	modelPath := os.Getenv("MODEL_PATH")
+	if modelPath == "" {
+		modelPath = "models/all-MiniLM-L6-v2/onnx/model.onnx"
+		os.Setenv("MODEL_PATH", modelPath)
+	}
+	return nil
 }
 
 func initOnnxRuntime() error {

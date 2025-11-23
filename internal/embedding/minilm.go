@@ -2,6 +2,7 @@ package embedding
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/mateosanchezl/go-vect/internal/tokenizer"
 	ort "github.com/yalue/onnxruntime_go"
@@ -109,7 +110,7 @@ func (m *MiniLM) EmbedBatch(chunks []string) (embeddings []EmbeddingVector, err 
 	}
 	defer outputTensor.Destroy()
 
-	session, err := ort.NewAdvancedSession("models/all-MiniLM-L6-v2/onnx/model.onnx",
+	session, err := ort.NewAdvancedSession(os.Getenv("MODEL_PATH"),
 		[]string{"input_ids", "attention_mask", "token_type_ids"},
 		[]string{"last_hidden_state"},
 		[]ort.Value{inputIds, attMask, typeIds},
