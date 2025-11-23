@@ -17,20 +17,44 @@ func StoreEmbedding(embedding embedding.EmbeddingVector, text string) error {
 
 	bs := vectorToByteSlice(embedding)
 
+	ofs, err := calculateOffset(embedding)
+	if err != nil {
+		return fmt.Errorf("failed to calculate offset: %w", err)
+	}
+
 	file, err := os.OpenFile(os.Getenv("VECTOR_DB_PATH"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open data file: %w", err)
 	}
 	defer file.Close()
 
+	vFileInfo, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to get file info: %w", err)
+	}
+	originalSize := vFileInfo.Size()
+
 	_, err = file.Write(bs)
 	if err != nil {
 		return fmt.Errorf("failed to write embedding to data file: %w", err)
 	}
+	file.Sync()
 
-	// Store embedding metadata
-	err = storeEmbeddingMetaData(embedding, text)
+	mdFile, err := os.OpenFile(os.Getenv("METADATA_DB_PATH"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
+		return err
+	}
+	defer mdFile.Close()
+	mdFileInfo, err := mdFile.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to get file info: %w", err)
+	}
+	mdFileOriginalSize := mdFileInfo.Size()
+
+	err = storeEmbeddingMetaData(mdFile, text, ofs)
+	if err != nil {
+		file.Truncate(originalSize)
+		mdFile.Truncate(mdFileOriginalSize)
 		return fmt.Errorf("failed to store embedding metadata: %w", err)
 	}
 
@@ -55,20 +79,9 @@ type EmbeddingMetaData struct {
 	Text   string
 }
 
-func storeEmbeddingMetaData(embedding embedding.EmbeddingVector, text string) (err error) {
-	file, err := os.OpenFile(os.Getenv("METADATA_DB_PATH"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	ofs, err := calculateOffset(embedding)
-	if err != nil {
-		return fmt.Errorf("failed to calculate offset: %w", err)
-	}
-
+func storeEmbeddingMetaData(file *os.File, text string, offset int) (err error) {
 	md := EmbeddingMetaData{
-		Offset: ofs,
+		Offset: offset,
 		Text:   text,
 	}
 
@@ -81,6 +94,7 @@ func storeEmbeddingMetaData(embedding embedding.EmbeddingVector, text string) (e
 	if err != nil {
 		return err
 	}
+	file.Sync()
 
 	return nil
 }
